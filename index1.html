@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, viewport-fit=cover"
+  >
+
+  <title>Something’s Taking Shape</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #111;
+      color: white;
+      font-family: Arial, sans-serif;
+    }
+
+    #camera,
+    #effect {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    #camera {
+      object-fit: cover;
+      z-index: 0;
+    }
+
+    #effect {
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    #welcome {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      display: grid;
+      place-items: center;
+      padding: 28px;
+      background: #111;
+      text-align: center;
+    }
+
+    h1 {
+      margin: 0 0 18px;
+      font-size: 38px;
+      line-height: 1.1;
+    }
+
+    p {
+      color: #ccc;
+      line-height: 1.5;
+    }
+
+    button {
+      padding: 15px 28px;
+      border: none;
+      border-radius: 28px;
+      background: #ffdc51;
+      color: #111;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+    }
+
+    #hint {
+      position: fixed;
+      top: max(24px, env(safe-area-inset-top));
+      left: 20px;
+      right: 20px;
+      z-index: 4;
+      text-align: center;
+      pointer-events: none;
+    }
+
+    #hint span {
+      display: inline-block;
+      padding: 10px 16px;
+      border-radius: 22px;
+      background: rgba(0, 0, 0, 0.65);
+      font-size: 14px;
+    }
+
+    #popup {
+      position: fixed;
+      left: 20px;
+      right: 20px;
+      bottom: max(48px, env(safe-area-inset-bottom));
+      z-index: 5;
+      text-align: center;
+      pointer-events: none;
+      opacity: 0;
+      transform: translateY(12px);
+      transition:
+        opacity 0.7s ease,
+        transform 0.7s ease;
+    }
+
+    #popup.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    #popup .card {
+      display: inline-block;
+      padding: 18px 24px;
+      border: 1px solid rgba(255, 220, 81, 0.4);
+      border-radius: 18px;
+      background: rgba(12, 12, 12, 0.85);
+    }
+
+    #popup strong {
+      display: block;
+      color: #ffdc51;
+      font-size: 24px;
+    }
+
+    #popup small {
+      display: block;
+      margin-top: 8px;
+      color: #eee;
+      font-size: 13px;
+      letter-spacing: 1px;
+    }
+
+    #error {
+      max-width: 340px;
+      color: #ffd2a8;
+      font-size: 14px;
+    }
+
+    [hidden] {
+      display: none !important;
+    }
+  </style>
+</head>
+
+<body>
+
+  <video
+    id="camera"
+    autoplay
+    muted
+    playsinline
+    webkit-playsinline
+  ></video>
+
+  <canvas id="effect"></canvas>
+
+  <div id="welcome">
+    <div>
+      <h1>There’s more<br>to this box.</h1>
+
+      <p>Point your camera at the black box.</p>
+
+      <button id="start">Start camera</button>
+
+      <p id="error" role="alert"></p>
+    </div>
+  </div>
+
+  <div id="hint" hidden>
+    <span id="hint-text">Point at the black box.</span>
+  </div>
+
+  <div id="popup">
+    <div class="card">
+      <strong>Something’s taking shape.</strong>
+      <small>CHOOSE WHAT’S NEXT</small>
+    </div>
+  </div>
+
+  <script>
+    /*
+      No Hiro marker.
+      No Drop button.
+      No external libraries.
+
+      Prototype trigger:
+      detects a large dark, box-shaped region.
+
+      This is not a trained object-recognition model.
+      Other dark objects may also trigger it.
+
+      The virtual cube is approximately one third
+      of the detected physical box's width:
+      3 feet compared with a 9-foot installation.
+
+      Position and size are visual estimates.
+    */
+
+    const CONFIG = {
+      physicalBoxFeet: 9,
+      virtualBoxFeet: 3,
+
+      detectionInterval: 150,
+      stableFrames: 5,
+
+      riseDuration: 2200,
+      pulseDuration: 3200,
+
+      hideAfter: 650,
+      resetAfter: 2800
+    };
+
+    const video = document.getElementById("camera");
+    const canvas = document.getElementById("effect");
+    const ctx = canvas.getContext("2d");
+
+    const startButton = document.getElementById("start");
+    const welcome = document.getElementById("welcome");
+    const hint = document.getElementById("hint");
+    const hintText = document.getElementById("hint-text");
+    const popup = document.getElementById("popup");
+    const errorText = document.getElementById("error");
+
+    const scanCanvas = document.createElement("canvas");
+
+    const scanContext = scanCanvas.getContext("2d", {
+      willReadFrequently: true
+    });
+
+    scanCanvas.width = 160;
+    scanCanvas.height = 120;
+
+    let stream = null;
+    let active = false;
+
+    let screenWidth = window.innerWidth;
+    let screenHeight = window.innerHeight;
+
+    let lastDetection = 0;
+    let lastSeen = 0;
+
+    let candidate = null;
+    let target = null;
+    let stableCount = 0;
+
+    let triggered = false;
+    let riseStarted = 0;
+
+    function resize() {
+      screenWidth = window.innerWidth;
+      screenHeight = window.innerHeight;
+
+      const dpr = Math.min(
+        window.devicePixelRatio || 1,
+        2
+      );
+
+      canvas.width = Math.round(screenWidth * dpr);
+      canvas.height = Math.round(screenHeight * dpr);
+
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    function resetDetection() {
+      candidate = null;
+      target = null;
+      stableCount = 0;
+      triggered = false;
+      riseStarted = 0;
+
+      popup.classList.remove("visible");
+      hintText.textContent = "Point at the black box.";
+    }
+
+    function overlap(a, b) {
+      if (!a || !b) {
+        return 0;
+      }
+
+      const left = Math.max(a.x, b.x);
+      const top = Math.max(a.y, b.y);
+
+      const right = Math.min(
+        a.x + a.w,
+        b.x + b.w
+      );
+
+      const bottom = Math.min(
+        a.y + a.h,
+        b.y + b.h
+      );
+
+      const intersection =
+        Math.max(0, right - left) *
+        Math.max(0, bottom - top);
+
+      const union =
+        a.w * a.h +
+        b.w * b.h -
+        intersection;
+
+      return union > 0 ? intersection / union : 0;
+    }
+
+    // Find connected dark regions in the camera image.
+    function detectDarkBox(image) {
+      const {
+        data,
+        width: w,
+        height: h
+      } = image;
+
+      const count = w * h;
+
+      const mask = new Uint8Array(count);
+      const seen = new Uint8Array(count);
+      const queue = new Int32Array(count);
+
+      for (let i = 0; i < count; i++) {
+        const p = i * 4;
+
+        const luminance =
+          0.2126 * data[p] +
+          0.7152 * data[p + 1] +
+          0.0722 * data[p + 2];
+
+        mask[i] = luminance < 65 ? 1 : 0;
+      }
+
+      let best = null;
+      let bestScore = 0;
+
+      for (let start = 0; start < count; start++) {
+        if (!mask[start] || seen[start]) {
+          continue;
+        }
+
+        let head = 0;
+        let tail = 0;
+        let pixels = 0;
+
+        let minX = w;
+        let minY = h;
+        let maxX = 0;
+        let maxY = 0;
+
+        let darknessSum = 0;
+
+        queue[tail++] = start;
+        seen[start] = 1;
+
+        while (head < tail) {
+          const index = queue[head++];
+
+          const x = index % w;
+          const y = Math.floor(index / w);
+
+          pixels++;
+
+          minX = Math.min(minX, x);
+          minY = Math.min(minY, y);
+          maxX = Math.max(maxX, x);
+          maxY = Math.max(maxY, y);
+
+          darknessSum += (
+            data[index * 4] +
+            data[index * 4 + 1] +
+            data[index * 4 + 2]
+          ) / 3;
+
+          const neighbors = [
+            x > 0 ? index - 1 : -1,
+            x < w - 1 ? index + 1 : -1,
+            y > 0 ? index - w : -1,
+            y < h - 1 ? index + w : -1
+          ];
+
+          for (const next of neighbors) {
+            if (
+              next >= 0 &&
+              mask[next] &&
+              !seen[next]
+            ) {
+              seen[next] = 1;
+              queue[tail++] = next;
+            }
+          }
+        }
+
+        const boxWidth = maxX - minX + 1;
+        const boxHeight = maxY - minY + 1;
+
+        const area = boxWidth * boxHeight;
+        const ratio = boxWidth / boxHeight;
+        const fill = pixels / area;
+
+        if (
+          pixels < count * 0.025 ||
+          area > count * 0.7 ||
+          boxWidth < 18 ||
+          boxHeight < 18 ||
+          ratio < 0.5 ||
+          ratio > 1.85 ||
+          fill < 0.65
+        ) {
+          continue;
+        }
+
+        // Reject regions clipped by the camera frame.
+        if (
+          minX < 2 ||
+          minY < 2 ||
+          maxX > w - 3 ||
+          maxY > h - 3
+        ) {
+          continue;
+        }
+
+        // Check for contrast around the dark object.
+        let surroundingSum = 0;
+        let samples = 0;
+
+        for (
+          let y = Math.max(0, minY - 4);
+          y <= Math.min(h - 1, maxY + 4);
+          y++
+        ) {
+          for (
+            let x = Math.max(0, minX - 4);
+            x <= Math.min(w - 1, maxX + 4);
+            x++
+          ) {
+            if (
+              x >= minX &&
+              x <= maxX &&
+              y >= minY &&
+              y <= maxY
+            ) {
+              continue;
+            }
+
+            const p = (y * w + x) * 4;
+
+            surroundingSum += (
+              data[p] +
+              data[p + 1] +
+              data[p + 2]
+            ) / 3;
+
+            samples++;
+          }
+        }
+
+        const contrast =
+          samples > 0
+            ? surroundingSum / samples -
+              darknessSum / pixels
+            : 0;
+
+        if (contrast < 18) {
+          continue;
+        }
+
+        const score = pixels * fill;
+
+        if (score > bestScore) {
+          bestScore = score;
+
+          best = {
+            x: minX,
+            y: minY,
+            w: boxWidth,
+            h: boxHeight
+          };
+        }
+      }
+
+      return best;
+    }
+
+    function updateDetection(now) {
+      if (
+        !active ||
+        video.readyState < 2 ||
+        video.paused
+      ) {
+        return;
+      }
+
+      // Match the scan aspect ratio to the video.
+      const scanHeight = Math.max(
+        60,
+        Math.round(
+          scanCanvas.width *
+          video.videoHeight /
+          video.videoWidth
+        )
+      );
+
+      if (scanCanvas.height !== scanHeight) {
+        scanCanvas.height = scanHeight;
+      }
+
+      scanContext.drawImage(
+        video,
+        0,
+        0,
+        scanCanvas.width,
+        scanCanvas.height
+      );
+
+      const image = scanContext.getImageData(
+        0,
+        0,
+        scanCanvas.width,
+        scanCanvas.height
+      );
+
+      const detected = detectDarkBox(image);
+
+      if (!detected) {
+        candidate = null;
+        stableCount = 0;
+        return;
+      }
+
+      const normalized = {
+        x: detected.x / image.width,
+        y: detected.y / image.height,
+        w: detected.w / image.width,
+        h: detected.h / image.height
+      };
+
+      if (triggered) {
+        // Avoid jumping to another object mid-animation.
+        if (overlap(target, normalized) < 0.2) {
+          return;
+        }
+
+        for (const key of ["x", "y", "w", "h"]) {
+          target[key] += (
+            normalized[key] - target[key]
+          ) * 0.25;
+        }
+
+        lastSeen = now;
+        return;
+      }
+
+      stableCount =
+        overlap(candidate, normalized) > 0.45
+          ? stableCount + 1
+          : 1;
+
+      candidate = normalized;
+
+      hintText.textContent = "Hold for a moment…";
+
+      if (stableCount >= CONFIG.stableFrames) {
+        target = { ...normalized };
+
+        triggered = true;
+        riseStarted = now;
+        lastSeen = now;
+
+        hintText.textContent = "Something is stirring…";
+      }
+    }
+
+    // Convert camera coordinates to the cropped
+    // object-fit: cover video shown on screen.
+    function screenBox(box) {
+      const scale = Math.max(
+        screenWidth / video.videoWidth,
+        screenHeight / video.videoHeight
+      );
+
+      const displayedWidth =
+        video.videoWidth * scale;
+
+      const displayedHeight =
+        video.videoHeight * scale;
+
+      return {
+        x:
+          box.x * displayedWidth +
+          (screenWidth - displayedWidth) / 2,
+
+        y:
+          box.y * displayedHeight +
+          (screenHeight - displayedHeight) / 2,
+
+        w: box.w * displayedWidth,
+        h: box.h * displayedHeight
+      };
+    }
+
+    function polygon(points) {
+      ctx.beginPath();
+
+      points.forEach((point, index) => {
+        if (index === 0) {
+          ctx.moveTo(point[0], point[1]);
+        } else {
+          ctx.lineTo(point[0], point[1]);
+        }
+      });
+
+      ctx.closePath();
+    }
+
+    function drawBox(now) {
+      const detected = screenBox(target);
+
+      const sizeRatio =
+        CONFIG.virtualBoxFeet /
+        CONFIG.physicalBoxFeet;
+
+      const width = detected.w * sizeRatio;
+      const height = width;
+
+      const ground =
+        detected.y + detected.h;
+
+      const progress = Math.min(
+        (now - riseStarted) /
+        CONFIG.riseDuration,
+        1
+      );
+
+      const eased =
+        1 - Math.pow(1 - progress, 3);
+
+      const riseOffset =
+        height * 1.2 * (1 - eased);
+
+      const x =
+        detected.x +
+        detected.w / 2 -
+        width / 2;
+
+      const y =
+        ground - height + riseOffset;
+
+      const depthX = width * 0.18;
+      const depthY = height * 0.17;
+
+      const frontWidth = width - depthX;
+      const frontHeight = height - depthY;
+
+      const A = [x, y + depthY];
+      const B = [x + frontWidth, y + depthY];
+      const C = [
+        x + frontWidth,
+        y + depthY + frontHeight
+      ];
+
+      const D = [
+        x,
+        y + depthY + frontHeight
+      ];
+
+      const E = [x + depthX, y];
+      const F = [x + width, y];
+
+      const G = [
+        x + width,
+        y + frontHeight
+      ];
+
+      // Slow, gentle brightness pulse.
+      const pulse =
+        0.5 +
+        0.5 * Math.sin(
+          (now - riseStarted) *
+          Math.PI * 2 /
+          CONFIG.pulseDuration
+        );
+
+      ctx.save();
+
+      // Hide the part still below the ground line.
+      ctx.beginPath();
+      ctx.rect(
+        0,
+        0,
+        screenWidth,
+        Math.max(0, ground + 3)
+      );
+
+      ctx.clip();
+
+      // Simple dark cube faces.
+      ctx.fillStyle = "rgba(10, 11, 12, 0.88)";
+      polygon([A, B, C, D]);
+      ctx.fill();
+
+      ctx.fillStyle = "rgba(27, 28, 28, 0.88)";
+      polygon([A, E, F, B]);
+      ctx.fill();
+
+      ctx.fillStyle = "rgba(5, 6, 7, 0.9)";
+      polygon([B, F, G, C]);
+      ctx.fill();
+
+      const edges = [
+        [A, B],
+        [B, C],
+        [C, D],
+        [D, A],
+        [A, E],
+        [E, F],
+        [F, B],
+        [F, G],
+        [G, C]
+      ];
+
+      // Draw the soft glow, then a thin bright core.
+      for (let pass = 0; pass < 2; pass++) {
+        ctx.beginPath();
+
+        for (const [from, to] of edges) {
+          ctx.moveTo(from[0], from[1]);
+          ctx.lineTo(to[0], to[1]);
+        }
+
+        ctx.lineJoin = "round";
+        ctx.lineCap = "round";
+
+        ctx.strokeStyle =
+          pass === 0
+            ? `rgba(255, 210, 30, ${0.35 + pulse * 0.35})`
+            : `rgba(255, 235, 120, ${0.65 + pulse * 0.35})`;
+
+        ctx.lineWidth = pass === 0 ? 5 : 1.6;
+
+        ctx.shadowColor = "#ffd629";
+        ctx.shadowBlur =
+          pass === 0 ? 12 + pulse * 12 : 3;
+
+        ctx.stroke();
+      }
+
+      ctx.restore();
+
+      if (progress >= 1) {
+        popup.classList.add("visible");
+        hintText.textContent = "There’s more to come.";
+      }
+    }
+
+    function animate(now) {
+      requestAnimationFrame(animate);
+
+      ctx.clearRect(
+        0,
+        0,
+        screenWidth,
+        screenHeight
+      );
+
+      if (
+        !active ||
+        document.hidden ||
+        video.paused
+      ) {
+        popup.classList.remove("visible");
+        return;
+      }
+
+      if (
+        now - lastDetection >=
+        CONFIG.detectionInterval
+      ) {
+        lastDetection = now;
+        updateDetection(now);
+      }
+
+      if (!triggered) {
+        if (!candidate) {
+          hintText.textContent =
+            "Point at the black box.";
+        }
+
+        return;
+      }
+
+      const timeMissing = now - lastSeen;
+
+      if (timeMissing > CONFIG.resetAfter) {
+        resetDetection();
+        return;
+      }
+
+      if (timeMissing > CONFIG.hideAfter) {
+        popup.classList.remove("visible");
+
+        hintText.textContent =
+          "Point back at the black box.";
+
+        return;
+      }
+
+      drawBox(now);
+    }
+
+    startButton.onclick = async () => {
+      startButton.disabled = true;
+      errorText.textContent = "";
+
+      try {
+        if (
+          !window.isSecureContext ||
+          !navigator.mediaDevices?.getUserMedia
+        ) {
+          throw new Error("HTTPS_REQUIRED");
+        }
+
+        const hasLiveCamera = stream
+          ?.getVideoTracks()
+          .some(track => track.readyState === "live");
+
+        if (!hasLiveCamera) {
+          stream =
+            await navigator.mediaDevices.getUserMedia({
+              audio: false,
+
+              video: {
+                facingMode: {
+                  ideal: "environment"
+                },
+
+                width: {
+                  ideal: 1280
+                },
+
+                height: {
+                  ideal: 720
+                }
+              }
+            });
+
+          video.srcObject = stream;
+        }
+
+        video.muted = true;
+
+        await video.play();
+
+        active = true;
+        welcome.hidden = true;
+        hint.hidden = false;
+
+        resetDetection();
+        resize();
+      } catch (error) {
+        startButton.disabled = false;
+        startButton.textContent = "Try again";
+
+        if (error.message === "HTTPS_REQUIRED") {
+          errorText.textContent =
+            "Open the HTTPS GitHub Pages link in Safari or Chrome.";
+        } else if (
+          error.name === "NotAllowedError"
+        ) {
+          errorText.textContent =
+            "Allow camera access, then tap Try again.";
+        } else {
+          errorText.textContent =
+            "Camera unavailable. Open this page directly in Safari or Chrome.";
+        }
+
+        console.error(error);
+      }
+    };
+
+    window.addEventListener("resize", () => {
+      resize();
+      resetDetection();
+    });
+
+    document.addEventListener(
+      "visibilitychange",
+      () => {
+        if (!document.hidden) {
+          resetDetection();
+        }
+      }
+    );
+
+    window.addEventListener("pagehide", () => {
+      stream?.getTracks().forEach(track => {
+        track.stop();
+      });
+
+      stream = null;
+      active = false;
+
+      resetDetection();
+
+      welcome.hidden = false;
+      hint.hidden = true;
+
+      startButton.disabled = false;
+      startButton.textContent = "Start camera";
+    });
+
+    resize();
+    requestAnimationFrame(animate);
+  </script>
+
+</body>
+</html>
