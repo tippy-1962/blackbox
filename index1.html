@@ -2,12 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+
 <meta
   name="viewport"
   content="width=device-width,initial-scale=1,viewport-fit=cover"
 >
 
-<title>Something Big Is Coming</title>
+<title>Choose What's Next</title>
 
 <style>
   * {
@@ -39,36 +40,35 @@
   }
 
   #effect {
-    pointer-events: none;
     z-index: 2;
+    pointer-events: none;
   }
 
   #welcome {
     position: fixed;
     inset: 0;
     z-index: 10;
+    background: #111;
     display: grid;
     place-items: center;
-    background: #111;
-    padding: 26px;
     text-align: center;
+    padding: 26px;
   }
 
   h1 {
     font-size: 38px;
     line-height: 1.1;
-    margin: 0 0 18px;
   }
 
   p {
-    color: #ccc;
     line-height: 1.5;
+    color: #ccc;
   }
 
   button {
-    border: none;
+    border: 0;
     border-radius: 28px;
-    background: #ffdc51;
+    background: #ffb52e;
     color: #111;
     padding: 15px 28px;
     font-size: 16px;
@@ -93,68 +93,56 @@
   #hint span {
     display: inline-block;
     background: #111c;
-    border-radius: 20px;
     padding: 10px 16px;
+    border-radius: 20px;
     font-size: 14px;
   }
 
-  #popup {
+  #message {
     position: fixed;
-    left: 50%;
-    top: 50%;
-    width: min(90vw, 400px);
+    left: 5%;
+    width: 90%;
+    top: 68%;
     z-index: 5;
     text-align: center;
     pointer-events: none;
     opacity: 0;
 
     transform:
-      translate(-50%, -50%)
-      scale(0.72);
+      translateY(12px)
+      scale(0.85);
 
     transition:
-      opacity 0.25s,
-      transform 0.5s cubic-bezier(.16, 1, .3, 1);
+      opacity 0.4s,
+      transform 0.5s;
   }
 
-  #popup.visible {
+  #message.visible {
     opacity: 1;
 
     transform:
-      translate(-50%, -50%)
+      translateY(0)
       scale(1);
   }
 
-  #popup .card {
-    display: inline-block;
-    padding: 20px 14px;
-
-    background: radial-gradient(
-      ellipse,
-      #111e,
-      #1118 50%,
-      transparent 72%
-    );
-  }
-
-  #popup strong {
+  #message strong {
     display: block;
-    color: #ffdc51;
+    color: #ffb52e;
+    font-size: clamp(27px, 8vw, 43px);
     font-weight: 900;
-    font-size: clamp(24px, 7vw, 42px);
-    line-height: 0.98;
+    line-height: 1;
 
     text-shadow:
-      0 0 16px #ffcf5477,
-      0 3px 8px black;
+      0 2px 8px black,
+      0 0 18px #ffb52e66;
   }
 
-  #popup small {
+  #message small {
     display: block;
     margin-top: 12px;
-    font-size: 10px;
-    color: white;
+    font-size: 11px;
     letter-spacing: 2px;
+    text-shadow: 0 2px 6px black;
   }
 
   #error {
@@ -182,7 +170,7 @@
 
 <div id="welcome">
   <div>
-    <h1>There’s more<br>to this box.</h1>
+    <h1>There's more<br>to this box.</h1>
 
     <p>Point your camera at the black box.</p>
 
@@ -198,30 +186,34 @@
   </span>
 </div>
 
-<div id="popup">
-  <div class="card">
-    <strong>
-      SOMETHING BIG<br>
-      IS COMING.
-    </strong>
+<div id="message">
+  <strong>
+    SOMETHING BIG<br>
+    IS COMING.
+  </strong>
 
-    <small>CHOOSE WHAT’S NEXT</small>
-  </div>
+  <small>CHOOSE WHAT'S NEXT</small>
 </div>
 
 <script>
 "use strict";
 
 const CONFIG = {
-  physicalFeet: 9,
-  virtualFeet: 3,
+  rise: 1350,
 
-  riseMs: 1350,
-  holdMs: 1000,
-  shakeMs: 650,
-  openMs: 850,
+  plainHold: 500,
 
-  pulseMs: 3000
+  glow: 900,
+  shake: 650,
+  split: 850,
+
+  logoDelay: 650,
+  logoIn: 1000,
+
+  pulseMs: 3000,
+
+  // Sunset yellow.
+  yellow: "#ffb52e"
 };
 
 const $ = id => document.getElementById(id);
@@ -241,25 +233,43 @@ let H = innerHeight;
 
 let stream = null;
 let active = false;
+let failed = false;
 
-let target = null;
 let candidate = null;
-let confidenceMs = 0;
+let target = null;
+
+let confidence = 0;
 let candidateSeen = 0;
+let lastScan = 0;
 
 let triggered = false;
 let startedAt = 0;
-let lastSeen = 0;
-let lastScan = 0;
 
-let detectionFailed = false;
+let motionAllowed = false;
+let motionReceived = false;
+
+let motionBase = null;
+let motionLatest = null;
+
+let previousAlpha = null;
+let unwrappedAlpha = 0;
+
+let viewYaw = 0;
+let viewPitch = 0;
+
+let logoShown = false;
+let previousFrame = null;
 
 let audio = null;
-let rumblePlayed = false;
-let burstPlayed = false;
+let shakeSound = false;
+let splitSound = false;
 
-const clamp = value => {
-  return Math.max(0, Math.min(1, value));
+const clamp = (value, min = 0, max = 1) => {
+  return Math.max(min, Math.min(max, value));
+};
+
+const ease = value => {
+  return 1 - Math.pow(1 - clamp(value), 3);
 };
 
 const status = text => {
@@ -268,118 +278,49 @@ const status = text => {
   }
 };
 
-function stage(now) {
-  const elapsed = Math.max(
-    0,
-    now - startedAt
-  );
+function timing(t) {
+  const glowAt =
+    CONFIG.rise + CONFIG.plainHold;
 
-  const shakeStart =
-    CONFIG.riseMs + CONFIG.holdMs;
+  const shakeAt =
+    glowAt + CONFIG.glow;
 
-  const openStart =
-    shakeStart + CONFIG.shakeMs;
+  const splitAt =
+    shakeAt + CONFIG.shake;
+
+  const logoAt =
+    splitAt +
+    CONFIG.split +
+    CONFIG.logoDelay;
 
   return {
-    elapsed,
-    shakeStart,
-    openStart,
+    glowAt,
+    shakeAt,
+    splitAt,
+    logoAt,
 
-    rise: clamp(
-      elapsed / CONFIG.riseMs
+    rise: clamp(t / CONFIG.rise),
+
+    glow:
+      t < glowAt
+        ? 0
+        : clamp((t - glowAt) / 500),
+
+    shaking:
+      t >= shakeAt &&
+      t < splitAt,
+
+    split: clamp(
+      (t - splitAt) / CONFIG.split
     ),
 
-    shake:
-      elapsed >= shakeStart &&
-      elapsed < openStart,
+    reveal:
+      t >= splitAt + 220,
 
-    open: clamp(
-      (elapsed - openStart) /
-      CONFIG.openMs
+    logo: clamp(
+      (t - logoAt) / CONFIG.logoIn
     )
   };
-}
-
-function tone(
-  startHz,
-  endHz,
-  seconds,
-  volume
-) {
-  if (
-    !audio ||
-    audio.state !== "running"
-  ) {
-    return;
-  }
-
-  const now = audio.currentTime;
-
-  const oscillator =
-    audio.createOscillator();
-
-  const gain =
-    audio.createGain();
-
-  oscillator.frequency.setValueAtTime(
-    startHz,
-    now
-  );
-
-  oscillator.frequency.exponentialRampToValueAtTime(
-    endHz,
-    now + seconds
-  );
-
-  gain.gain.setValueAtTime(
-    0.001,
-    now
-  );
-
-  gain.gain.exponentialRampToValueAtTime(
-    volume,
-    now + 0.03
-  );
-
-  gain.gain.exponentialRampToValueAtTime(
-    0.001,
-    now + seconds
-  );
-
-  oscillator.connect(gain);
-  gain.connect(audio.destination);
-
-  oscillator.start(now);
-  oscillator.stop(now + seconds + 0.05);
-
-  oscillator.onended = () => {
-    oscillator.disconnect();
-    gain.disconnect();
-  };
-}
-
-function reset() {
-  target = null;
-  candidate = null;
-
-  confidenceMs = 0;
-  candidateSeen = 0;
-
-  triggered = false;
-  startedAt = 0;
-  lastSeen = 0;
-  lastScan = 0;
-
-  detectionFailed = false;
-
-  rumblePlayed = false;
-  burstPlayed = false;
-
-  video.style.transform = "";
-
-  $("popup").classList.remove("visible");
-
-  status("Looking for the black box…");
 }
 
 function resize() {
@@ -408,6 +349,37 @@ function resize() {
   );
 }
 
+function reset() {
+  candidate = null;
+  target = null;
+
+  confidence = 0;
+  candidateSeen = 0;
+  lastScan = 0;
+
+  triggered = false;
+  failed = false;
+
+  startedAt = 0;
+  logoShown = false;
+
+  motionBase = null;
+
+  viewYaw = 0;
+  viewPitch = 0;
+
+  previousFrame = null;
+
+  shakeSound = false;
+  splitSound = false;
+
+  video.style.transform = "";
+
+  $("message").classList.remove("visible");
+
+  status("Looking for the black box…");
+}
+
 function overlap(a, b) {
   if (!a || !b) {
     return 0;
@@ -416,17 +388,13 @@ function overlap(a, b) {
   const intersection =
     Math.max(
       0,
-      Math.min(
-        a.x + a.w,
-        b.x + b.w
-      ) - Math.max(a.x, b.x)
+      Math.min(a.x + a.w, b.x + b.w) -
+      Math.max(a.x, b.x)
     ) *
     Math.max(
       0,
-      Math.min(
-        a.y + a.h,
-        b.y + b.h
-      ) - Math.max(a.y, b.y)
+      Math.min(a.y + a.h, b.y + b.h) -
+      Math.max(a.y, b.y)
     );
 
   const union =
@@ -437,7 +405,6 @@ function overlap(a, b) {
   return intersection / (union || 1);
 }
 
-// Automatic dark-region detection.
 function detectBox(image) {
   const {
     width: w,
@@ -474,7 +441,7 @@ function detectBox(image) {
 
       let head = 0;
       let tail = 0;
-      let n = 0;
+      let count = 0;
       let sum = 0;
 
       let x0 = w;
@@ -491,7 +458,7 @@ function detectBox(image) {
         const x = p % w;
         const y = Math.floor(p / w);
 
-        n++;
+        count++;
         sum += gray[p];
 
         x0 = Math.min(x0, x);
@@ -507,14 +474,14 @@ function detectBox(image) {
           y < h - 1 ? p + w : -1
         ];
 
-        for (const q of neighbors) {
+        for (const next of neighbors) {
           if (
-            q >= 0 &&
-            !seen[q] &&
-            gray[q] <= threshold
+            next >= 0 &&
+            !seen[next] &&
+            gray[next] <= threshold
           ) {
-            seen[q] = 1;
-            queue[tail++] = q;
+            seen[next] = 1;
+            queue[tail++] = next;
           }
         }
       }
@@ -523,7 +490,7 @@ function detectBox(image) {
       const bh = y1 - y0 + 1;
 
       const area = bw * bh;
-      const fill = n / area;
+      const fill = count / area;
       const ratio = bw / bh;
 
       if (
@@ -576,18 +543,18 @@ function detectBox(image) {
       }
 
       const contrast = samples
-        ? ring / samples - sum / n
+        ? ring / samples - sum / count
         : 0;
 
       if (
         contrast < 12 ||
-        sum / n > 95
+        sum / count > 95
       ) {
         continue;
       }
 
       const score =
-        n *
+        count *
         fill *
         (
           0.7 +
@@ -653,28 +620,9 @@ function inspect(now) {
   );
 
   if (!found) {
-    if (
-      !triggered &&
-      now - candidateSeen > 650
-    ) {
+    if (now - candidateSeen > 650) {
       candidate = null;
-      confidenceMs = 0;
-
-      status("Looking for the black box…");
-    }
-
-    return;
-  }
-
-  if (triggered) {
-    if (overlap(target, found) > 0.15) {
-      for (const key of ["x", "y", "w", "h"]) {
-        target[key] += (
-          found[key] - target[key]
-        ) * 0.3;
-      }
-
-      lastSeen = now;
+      confidence = 0;
     }
 
     return;
@@ -684,12 +632,12 @@ function inspect(now) {
     overlap(candidate, found) > 0.25 &&
     now - candidateSeen < 650
   ) {
-    confidenceMs += Math.min(
-      now - candidateSeen,
-      200
+    confidence += Math.min(
+      200,
+      now - candidateSeen
     );
   } else {
-    confidenceMs = 0;
+    confidence = 0;
   }
 
   candidate = found;
@@ -697,402 +645,679 @@ function inspect(now) {
 
   status("Box-shaped object found…");
 
-  if (confidenceMs >= 450) {
+  if (confidence >= 450) {
     target = { ...found };
 
     triggered = true;
     startedAt = now;
-    lastSeen = now;
 
-    status("Something is stirring…");
+    status("Watch the box.");
   }
 }
 
-function path(points) {
+async function allowMotion() {
+  try {
+    if (!window.DeviceOrientationEvent) {
+      return false;
+    }
+
+    if (
+      typeof DeviceOrientationEvent
+        .requestPermission === "function"
+    ) {
+      const permission =
+        await DeviceOrientationEvent
+          .requestPermission();
+
+      return permission === "granted";
+    }
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+addEventListener("deviceorientation", event => {
+  if (
+    !motionAllowed ||
+    event.beta === null ||
+    event.gamma === null
+  ) {
+    return;
+  }
+
+  const alpha = event.alpha ?? 0;
+
+  if (previousAlpha !== null) {
+    unwrappedAlpha += (
+      (alpha - previousAlpha + 540) % 360
+    ) - 180;
+  }
+
+  previousAlpha = alpha;
+  motionReceived = true;
+
+  motionLatest = {
+    alpha: unwrappedAlpha,
+    beta: event.beta,
+    gamma: event.gamma
+  };
+
+  if (!motionBase) {
+    motionBase = { ...motionLatest };
+  }
+});
+
+function tone(from, to, duration, volume) {
+  if (
+    !audio ||
+    audio.state !== "running"
+  ) {
+    return;
+  }
+
+  const now = audio.currentTime;
+
+  const oscillator =
+    audio.createOscillator();
+
+  const gain =
+    audio.createGain();
+
+  oscillator.frequency.setValueAtTime(
+    from,
+    now
+  );
+
+  oscillator.frequency.exponentialRampToValueAtTime(
+    to,
+    now + duration
+  );
+
+  gain.gain.setValueAtTime(
+    0.001,
+    now
+  );
+
+  gain.gain.exponentialRampToValueAtTime(
+    volume,
+    now + 0.03
+  );
+
+  gain.gain.exponentialRampToValueAtTime(
+    0.001,
+    now + duration
+  );
+
+  oscillator.connect(gain);
+  gain.connect(audio.destination);
+
+  oscillator.start(now);
+  oscillator.stop(now + duration + 0.05);
+
+  oscillator.onended = () => {
+    oscillator.disconnect();
+    gain.disconnect();
+  };
+}
+
+function cuboid(
+  cx, cy, cz,
+  width, height, depth,
+  color = "#08090b"
+) {
+  const x = width / 2;
+  const y = height / 2;
+  const z = depth / 2;
+
+  const vertices = [
+    [-x, -y, -z],
+    [ x, -y, -z],
+    [ x,  y, -z],
+    [-x,  y, -z],
+
+    [-x, -y,  z],
+    [ x, -y,  z],
+    [ x,  y,  z],
+    [-x,  y,  z]
+  ].map(point => [
+    point[0] + cx,
+    point[1] + cy,
+    point[2] + cz
+  ]);
+
+  const faces = [
+    [4, 5, 6, 7],
+    [1, 0, 3, 2],
+    [0, 4, 7, 3],
+    [5, 1, 2, 6],
+    [7, 6, 2, 3],
+    [0, 1, 5, 4]
+  ];
+
+  const shades = [
+    "#08090b",
+    "#050607",
+    "#111318",
+    "#050607",
+    "#25282d",
+    "#070809"
+  ];
+
+  return faces.map((face, index) => ({
+    v: face.map(i => vertices[i]),
+
+    color:
+      color === "#08090b"
+        ? shades[index]
+        : color
+  }));
+}
+
+function roundedBlock(
+  cx, cy,
+  width, height, depth
+) {
+  const radius = 0.065;
+  const ring = [];
+
+  const corners = [
+    [
+      width / 2 - radius,
+      height / 2 - radius,
+      0
+    ],
+
+    [
+      -width / 2 + radius,
+      height / 2 - radius,
+      90
+    ],
+
+    [
+      -width / 2 + radius,
+      -height / 2 + radius,
+      180
+    ],
+
+    [
+      width / 2 - radius,
+      -height / 2 + radius,
+      270
+    ]
+  ];
+
+  for (const [x, y, start] of corners) {
+    for (let i = 0; i <= 5; i++) {
+      const angle =
+        (start + i * 18) *
+        Math.PI / 180;
+
+      ring.push([
+        x + Math.cos(angle) * radius + cx,
+        y + Math.sin(angle) * radius + cy
+      ]);
+    }
+  }
+
+  const front = ring.map(([x, y]) => [
+    x,
+    y,
+    depth / 2
+  ]);
+
+  const back = ring.map(([x, y]) => [
+    x,
+    y,
+    -depth / 2
+  ]);
+
+  const faces = [
+    {
+      v: front,
+      color: "#030405"
+    },
+
+    {
+      v: [...back].reverse(),
+      color: "#08090b"
+    }
+  ];
+
+  for (let i = 0; i < ring.length; i++) {
+    const next = (i + 1) % ring.length;
+
+    faces.push({
+      v: [
+        front[i],
+        back[i],
+        back[next],
+        front[next]
+      ],
+
+      color: "#17191c"
+    });
+  }
+
+  return faces;
+}
+
+const logoMesh = [
+  ...roundedBlock(
+    -0.55, 0.62,
+    1, 1, 0.48
+  ),
+
+  ...roundedBlock(
+    0.55, 0.62,
+    1, 1, 0.48
+  ),
+
+  ...roundedBlock(
+    0.55, -0.48,
+    1, 1, 0.48
+  ),
+
+  ...cuboid(
+    0, -1.11, 0,
+    2.1, 0.035, 0.16,
+    CONFIG.yellow
+  )
+];
+
+const cubeMesh = cuboid(
+  0, 0, 0,
+  1, 1, 1
+);
+
+function rotate(
+  [x, y, z],
+  yaw,
+  pitch,
+  roll = 0
+) {
+  const cy = Math.cos(yaw);
+  const sy = Math.sin(yaw);
+
+  const cp = Math.cos(pitch);
+  const sp = Math.sin(pitch);
+
+  const rx = x * cy + z * sy;
+  const rz = -x * sy + z * cy;
+
+  const ry = y * cp - rz * sp;
+  const rzz = y * sp + rz * cp;
+
+  return [
+    rx * Math.cos(roll) -
+    ry * Math.sin(roll),
+
+    rx * Math.sin(roll) +
+    ry * Math.cos(roll),
+
+    rzz
+  ];
+}
+
+function polygon(points) {
   ctx.beginPath();
 
-  points.forEach(([x, y], index) => {
+  points.forEach((point, index) => {
     if (index === 0) {
-      ctx.moveTo(x, y);
+      ctx.moveTo(point.x, point.y);
     } else {
-      ctx.lineTo(x, y);
+      ctx.lineTo(point.x, point.y);
     }
   });
 
   ctx.closePath();
 }
 
-// Rise, hold, shake, split and reveal.
-function draw(now) {
-  const box = {
-    x: target.x * W,
-    y: target.y * H,
-    w: target.w * W,
-    h: target.h * H
-  };
+function renderMesh(
+  mesh,
+  cx,
+  cy,
+  scale,
+  yaw,
+  pitch,
+  options = {}
+) {
+  const polygons = mesh.map((face, index) => {
+    const rotated = face.v.map(vertex => {
+      return rotate(
+        vertex,
+        yaw,
+        pitch,
+        options.roll || 0
+      );
+    });
 
-  const size =
-    box.w *
-    CONFIG.virtualFeet /
-    CONFIG.physicalFeet;
+    const points = rotated.map(([x, y, z]) => {
+      const perspective = 6 / (6 - z);
 
-  const ground = Math.min(
-    H - 12,
-    box.y + box.h
+      return {
+        x: cx + x * scale * perspective,
+        y: cy - y * scale * perspective
+      };
+    });
+
+    let moveX = 0;
+    let moveY = 0;
+
+    if (options.split) {
+      const directions = [
+        [-0.75, 0.6],
+        [0.5, -0.45],
+        [-1, 0],
+        [1, 0],
+        [0, -1],
+        [0.1, 0.8]
+      ];
+
+      const direction =
+        directions[index % 6];
+
+      moveX =
+        direction[0] *
+        options.split *
+        scale;
+
+      moveY =
+        direction[1] *
+        options.split *
+        scale;
+    }
+
+    return {
+      face,
+
+      points: points.map(point => ({
+        x: point.x + moveX,
+        y: point.y + moveY
+      })),
+
+      depth: rotated.reduce(
+        (sum, point) => sum + point[2],
+        0
+      ) / rotated.length
+    };
+  }).sort((a, b) => a.depth - b.depth);
+
+  for (const { face, points } of polygons) {
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = face.color;
+
+    polygon(points);
+    ctx.fill();
+
+    if (options.glow > 0) {
+      ctx.strokeStyle =
+        `rgba(255,181,46,${options.glow})`;
+
+      ctx.lineWidth = 2;
+
+      ctx.shadowColor = CONFIG.yellow;
+      ctx.shadowBlur = 14 * options.glow;
+
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
+  }
+}
+
+function drawSequence(now, dt) {
+  const elapsed = now - startedAt;
+  const sequence = timing(elapsed);
+
+  const size = Math.min(
+    W * 0.65,
+    H * 0.34,
+    350
   );
 
-  const cx = box.x + box.w / 2;
-  const cy = ground - size * 0.5;
+  const cx = clamp(
+    (target.x + target.w / 2) * W,
+    size * 0.7,
+    W - size * 0.7
+  );
 
-  const st = stage(now);
+  const ground = clamp(
+    (target.y + target.h) * H,
+    H * 0.55,
+    H * 0.77
+  );
 
-  const eased =
-    1 - Math.pow(1 - st.rise, 4);
+  const cy = ground - size * 0.52;
 
-  const offset =
-    size * 1.3 * (1 - eased);
+  const riseOffset =
+    size *
+    1.5 *
+    (1 - ease(sequence.rise));
 
-  const burst =
-    1 - Math.pow(1 - st.open, 3);
-
-  const shaking = st.shake
+  const quake = sequence.shaking
     ? Math.sin(
-        (st.elapsed - st.shakeStart) /
-        CONFIG.shakeMs *
+        (elapsed - sequence.shakeAt) /
+        CONFIG.shake *
         Math.PI
       )
     : 0;
 
   const sx =
-    Math.sin(st.elapsed * 0.095) *
+    Math.sin(elapsed * 0.095) *
     5 *
-    shaking;
+    quake;
 
   const sy =
-    Math.cos(st.elapsed * 0.125) *
+    Math.cos(elapsed * 0.11) *
     3 *
-    shaking;
+    quake;
 
-  const twist =
-    Math.sin(st.elapsed * 0.08) *
-    0.075 *
-    shaking;
-
-  const pulse =
-    0.55 +
-    0.45 * Math.sin(
-      st.elapsed *
-      Math.PI * 2 /
-      CONFIG.pulseMs
-    );
-
-  if (st.shake && !rumblePlayed) {
-    rumblePlayed = true;
-
-    tone(48, 75, 0.5, 0.12);
-  }
-
-  if (st.open > 0 && !burstPlayed) {
-    burstPlayed = true;
-
-    tone(155, 30, 0.7, 0.3);
-  }
-
-  video.style.transform = st.shake
+  video.style.transform = sequence.shaking
     ? `translate(${sx}px, ${sy}px) scale(1.035)`
     : "";
+
+  if (sequence.shaking && !shakeSound) {
+    shakeSound = true;
+
+    tone(48, 80, 0.55, 0.1);
+  }
+
+  if (sequence.split > 0 && !splitSound) {
+    splitSound = true;
+
+    tone(155, 30, 0.7, 0.25);
+  }
 
   ctx.save();
   ctx.translate(sx, sy);
 
-  // Hide the portion still below the ground.
-  if (st.rise < 1) {
+  if (sequence.rise < 1) {
     ctx.beginPath();
-
-    ctx.rect(
-      0,
-      0,
-      W,
-      Math.max(0, ground + 2)
-    );
-
+    ctx.rect(0, 0, W, ground + 2);
     ctx.clip();
   }
 
-  // Yellow energy glow.
-  const glowRadius = Math.max(
-    1,
-    size * (0.65 + burst)
-  );
-
-  const glow = ctx.createRadialGradient(
-    cx, cy, 0,
-    cx, cy, glowRadius
-  );
-
-  const power = st.shake
-    ? 0.24
-    : st.open > 0
-      ? 0.45 * (1 - st.open * 0.5)
-      : 0.045;
-
-  glow.addColorStop(
-    0,
-    `rgba(255,219,65,${power})`
-  );
-
-  glow.addColorStop(
-    1,
-    "rgba(255,210,20,0)"
-  );
-
-  ctx.fillStyle = glow;
-
-  ctx.fillRect(
-    cx - glowRadius,
-    cy - glowRadius,
-    glowRadius * 2,
-    glowRadius * 2
-  );
-
-  // Six cube panels.
-  const faces = [
-    {
-      v: [
-        [-0.5, -0.5, 0.5],
-        [0.5, -0.5, 0.5],
-        [0.5, 0.5, 0.5],
-        [-0.5, 0.5, 0.5]
-      ],
-      dir: [-0.55, 0.65],
-      color: "#090a0c"
-    },
-
-    {
-      v: [
-        [0.5, -0.5, -0.5],
-        [-0.5, -0.5, -0.5],
-        [-0.5, 0.5, -0.5],
-        [0.5, 0.5, -0.5]
-      ],
-      dir: [0.5, -0.4],
-      color: "#08090a"
-    },
-
-    {
-      v: [
-        [-0.5, -0.5, -0.5],
-        [-0.5, -0.5, 0.5],
-        [-0.5, 0.5, 0.5],
-        [-0.5, 0.5, -0.5]
-      ],
-      dir: [-1, -0.05],
-      color: "#101114"
-    },
-
-    {
-      v: [
-        [0.5, -0.5, 0.5],
-        [0.5, -0.5, -0.5],
-        [0.5, 0.5, -0.5],
-        [0.5, 0.5, 0.5]
-      ],
-      dir: [1, 0.05],
-      color: "#060708"
-    },
-
-    {
-      v: [
-        [-0.5, 0.5, 0.5],
-        [0.5, 0.5, 0.5],
-        [0.5, 0.5, -0.5],
-        [-0.5, 0.5, -0.5]
-      ],
-      dir: [0, -0.9],
-      color: "#24262a"
-    },
-
-    {
-      v: [
-        [-0.5, -0.5, -0.5],
-        [0.5, -0.5, -0.5],
-        [0.5, -0.5, 0.5],
-        [-0.5, -0.5, 0.5]
-      ],
-      dir: [0.1, 0.65],
-      color: "#08090b"
-    }
-  ];
-
-  const yaw = 0.43 + twist;
-
-  const cos = Math.cos(yaw);
-  const sin = Math.sin(yaw);
-
-  const panels = faces.map((face, index) => {
-    const projected = face.v.map(([x, y, z]) => {
-      const rx = x * cos + z * sin;
-      const rz = -x * sin + z * cos;
-
-      return {
-        x: rx * size / 1.33,
-
-        y:
-          (-y * 0.94 + rz * 0.34) *
-          size / 1.33,
-
-        z:
-          y * 0.34 + rz * 0.94
-      };
-    });
-
-    const mx = projected.reduce(
-      (sum, point) => sum + point.x,
-      0
-    ) / 4;
-
-    const my = projected.reduce(
-      (sum, point) => sum + point.y,
-      0
-    ) / 4;
-
-    const angle =
-      burst * (index % 2 ? -0.28 : 0.28);
-
-    const c = Math.cos(angle);
-    const s = Math.sin(angle);
-
-    return {
-      color: face.color,
-
-      depth: projected.reduce(
-        (sum, point) => sum + point.z,
-        0
-      ) / 4,
-
-      points: projected.map(point => [
-        cx +
-        mx +
-        (point.x - mx) * c -
-        (point.y - my) * s +
-        face.dir[0] * size * burst * 1.25,
-
-        cy +
-        offset +
-        my +
-        (point.x - mx) * s +
-        (point.y - my) * c +
-        face.dir[1] * size * burst * 0.9
-      ])
-    };
-  }).sort((a, b) => a.depth - b.depth);
-
-  // Draw panels from back to front.
-  for (const panel of panels) {
-    ctx.globalAlpha = 1 - burst * 0.28;
-    ctx.shadowBlur = 0;
-
-    ctx.fillStyle = panel.color;
-
-    path(panel.points);
-    ctx.fill();
-
-    // Soft yellow glow plus bright edge.
-    for (let pass = 0; pass < 2; pass++) {
-      path(panel.points);
-
-      ctx.lineJoin = "round";
-
-      ctx.strokeStyle = pass
-        ? "#fff0a0"
-        : `rgba(255,209,32,${0.55 + pulse * 0.4})`;
-
-      ctx.lineWidth = pass ? 1.3 : 3;
-
-      ctx.shadowColor = "#ffd52b";
-
-      ctx.shadowBlur = pass
-        ? 2
-        : 10 + pulse * 12 + shaking * 10;
-
-      ctx.stroke();
-    }
-  }
-
-  ctx.globalAlpha = 1;
-  ctx.shadowBlur = 0;
-
-  // Brief flash and expanding light ring.
-  if (st.open > 0) {
-    const flash = Math.max(
-      0,
-      1 - st.open * 5
+  const panelFade =
+    1 - clamp(
+      (
+        elapsed -
+        (sequence.splitAt + CONFIG.split)
+      ) / 800
     );
 
-    if (flash > 0) {
-      ctx.fillStyle =
-        `rgba(255,236,157,${flash * 0.28})`;
+  if (panelFade > 0) {
+    ctx.globalAlpha = panelFade;
 
-      ctx.fillRect(0, 0, W, H);
-    }
-
-    if (st.open < 1) {
-      ctx.beginPath();
-
-      ctx.ellipse(
-        cx,
-        cy,
-
-        size * (0.2 + st.open * 2),
-        size * (0.07 + st.open * 0.6),
-
-        0,
-        0,
-        Math.PI * 2
+    const pulse =
+      0.72 +
+      0.28 * Math.sin(
+        elapsed *
+        Math.PI * 2 /
+        CONFIG.pulseMs
       );
 
-      ctx.strokeStyle =
-        `rgba(255,220,81,${(1 - st.open) * 0.8})`;
+    renderMesh(
+      cubeMesh,
 
-      ctx.lineWidth = 2;
-      ctx.stroke();
-    }
+      cx,
+      cy + riseOffset,
+
+      size,
+
+      0.42,
+      0.18,
+
+      {
+        glow: sequence.glow * pulse,
+
+        roll:
+          Math.sin(elapsed * 0.08) *
+          0.07 *
+          quake,
+
+        split:
+          ease(sequence.split) * 1.3
+      }
+    );
+
+    ctx.globalAlpha = 1;
+  }
+
+  if (
+    sequence.split > 0 &&
+    sequence.split < 0.3
+  ) {
+    ctx.fillStyle =
+      `rgba(
+        255,218,120,
+        ${(1 - sequence.split / 0.3) * 0.22}
+      )`;
+
+    ctx.fillRect(0, 0, W, H);
   }
 
   ctx.restore();
 
-  // Reveal the text between the separated panels.
-  const textY = Math.max(
-    100,
-    Math.min(H - 110, cy)
-  );
-
-  const textX = Math.max(
-    W * 0.46,
-    Math.min(W * 0.54, cx)
-  );
-
-  $("popup").style.left = textX + "px";
-  $("popup").style.top = textY + "px";
-
-  $("popup").classList.toggle(
+  $("message").classList.toggle(
     "visible",
-    st.open > 0.22
+    sequence.reveal
   );
+
+  if (sequence.logo > 0) {
+    if (!logoShown) {
+      logoShown = true;
+
+      motionBase = motionLatest
+        ? { ...motionLatest }
+        : null;
+    }
+
+    let yawTarget = 0.16;
+    let pitchTarget = 0.12;
+
+    if (
+      motionReceived &&
+      motionBase &&
+      motionLatest
+    ) {
+      yawTarget =
+        0.16 -
+        (
+          motionLatest.alpha -
+          motionBase.alpha
+        ) * Math.PI / 180 +
+        (
+          motionLatest.gamma -
+          motionBase.gamma
+        ) * 0.012;
+
+      pitchTarget =
+        0.12 +
+        clamp(
+          (
+            motionLatest.beta -
+            motionBase.beta
+          ) * Math.PI / 180,
+
+          -1.1,
+          1.1
+        );
+    } else {
+
+      yawTarget =
+        0.16 +
+        (
+          elapsed -
+          sequence.logoAt
+        ) / 1000 * 0.35;
+    }
+
+    const smoothing =
+      1 - Math.exp(-dt * 7);
+
+    viewYaw +=
+      (yawTarget - viewYaw) * smoothing;
+
+    viewPitch +=
+      (pitchTarget - viewPitch) * smoothing;
+
+    const show = ease(sequence.logo);
+
+    const logoScale =
+      Math.min(
+        W * 0.31,
+        H * 0.19,
+        150
+      ) *
+      (0.75 + 0.25 * show);
+
+    ctx.save();
+    ctx.globalAlpha = show;
+
+    renderMesh(
+      logoMesh,
+
+      W / 2,
+      H * 0.34 + (1 - show) * 40,
+
+      logoScale,
+
+      viewYaw,
+      viewPitch
+    );
+
+    ctx.restore();
+  }
 
   status(
-    st.rise < 1
-      ? "Something is rising…"
-      : st.elapsed < st.shakeStart
-        ? "Wait for it…"
-        : st.shake
+    sequence.logo > 0
+      ? motionReceived
+        ? "Tilt your phone to explore."
+        : "3D view — motion access is unavailable."
+      : sequence.reveal
+        ? "Choose what’s next."
+        : sequence.shaking
           ? "Something’s breaking through…"
-          : "Choose what’s next."
+          : elapsed >= sequence.glowAt
+            ? "Something is stirring…"
+            : sequence.rise < 1
+              ? "Watch the box rise."
+              : "Wait for it…"
   );
 }
 
 function animate(now) {
   requestAnimationFrame(animate);
+
+  const dt = previousFrame === null
+    ? 0
+    : Math.min(
+        (now - previousFrame) / 1000,
+        0.05
+      );
+
+  previousFrame = now;
 
   ctx.clearRect(0, 0, W, H);
 
@@ -1107,7 +1332,8 @@ function animate(now) {
   }
 
   if (
-    !detectionFailed &&
+    !triggered &&
+    !failed &&
     now - lastScan >= 180
   ) {
     lastScan = now;
@@ -1115,7 +1341,7 @@ function animate(now) {
     try {
       inspect(now);
     } catch (error) {
-      detectionFailed = true;
+      failed = true;
 
       status(
         "Detection stopped. Reload this page."
@@ -1125,50 +1351,20 @@ function animate(now) {
     }
   }
 
-  if (detectionFailed) {
-    return;
-  }
-
   if (triggered) {
-    const missing = now - lastSeen;
-
-    if (missing > 4000) {
-      reset();
-      return;
-    }
-
-    if (missing > 1500) {
-      $("popup").classList.remove("visible");
-
-      status("Point back at the black box.");
-
-      return;
-    }
-
-    draw(now);
-  } else if (
-    candidate &&
-    now - candidateSeen < 650
-  ) {
-    ctx.strokeStyle =
-      "rgba(255,220,81,.55)";
-
-    ctx.lineWidth = 1.5;
-
-    ctx.strokeRect(
-      candidate.x * W,
-      candidate.y * H,
-      candidate.w * W,
-      candidate.h * H
-    );
+    drawSequence(now, dt);
+  } else if (!candidate && !failed) {
+    status("Looking for the black box…");
   }
+
 }
 
 $("start").onclick = async () => {
   $("start").disabled = true;
   $("error").textContent = "";
 
-  // Unlock audio during the user's camera-start tap.
+  const motionRequest = allowMotion();
+
   try {
     const Audio =
       window.AudioContext ||
@@ -1222,6 +1418,8 @@ $("start").onclick = async () => {
 
     await video.play();
 
+    motionAllowed = await motionRequest;
+
     active = true;
 
     reset();
@@ -1238,13 +1436,29 @@ $("start").onclick = async () => {
         ? "Open your HTTPS GitHub Pages link."
         : error.name === "NotAllowedError"
           ? "Allow camera access, then try again."
-          : "Could not start camera. Open this page directly in Safari or Chrome.";
+          : "Camera unavailable. Open this page directly in Safari or Chrome.";
 
     console.error(error);
   }
 };
 
 addEventListener("resize", resize);
+
+addEventListener("orientationchange", () => {
+  motionBase = null;
+  previousAlpha = null;
+});
+
+document.addEventListener(
+  "visibilitychange",
+  () => {
+    previousFrame = null;
+
+    if (!document.hidden) {
+      reset();
+    }
+  }
+);
 
 addEventListener("pagehide", () => {
   stream?.getTracks().forEach(track => {
@@ -1260,15 +1474,6 @@ addEventListener("pagehide", () => {
   $("hint").hidden = true;
   $("start").disabled = false;
 });
-
-document.addEventListener(
-  "visibilitychange",
-  () => {
-    if (!document.hidden) {
-      reset();
-    }
-  }
-);
 
 resize();
 requestAnimationFrame(animate);
