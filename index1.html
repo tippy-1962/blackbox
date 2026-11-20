@@ -1,898 +1,903 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+<meta charset="UTF-8">
 
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1, viewport-fit=cover"
-  >
+<meta
+  name="viewport"
+  content="width=device-width,initial-scale=1,viewport-fit=cover"
+>
 
-  <title>Something’s Taking Shape</title>
+<title>Something’s Taking Shape</title>
 
-  <style>
-    * {
-      box-sizing: border-box;
-    }
+<style>
+  * {
+    box-sizing: border-box;
+  }
 
-    html,
-    body {
-      width: 100%;
-      height: 100%;
-      margin: 0;
-      overflow: hidden;
-      background: #111;
-      color: white;
-      font-family: Arial, sans-serif;
-    }
+  html,
+  body {
+    margin: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #111;
+    color: #fff;
+    font-family: Arial, sans-serif;
+  }
 
-    #camera,
-    #effect {
-      position: fixed;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-    }
+  #camera,
+  #effect {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
 
-    #camera {
-      object-fit: cover;
-      z-index: 0;
-    }
+  #camera {
+    object-fit: cover;
+    z-index: 0;
+  }
 
-    #effect {
-      pointer-events: none;
-      z-index: 2;
-    }
+  #effect {
+    pointer-events: none;
+    z-index: 2;
+  }
 
-    #welcome {
-      position: fixed;
-      inset: 0;
-      z-index: 10;
-      display: grid;
-      place-items: center;
-      padding: 28px;
-      background: #111;
-      text-align: center;
-    }
+  #welcome {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    display: grid;
+    place-items: center;
+    background: #111;
+    text-align: center;
+    padding: 26px;
+  }
 
-    h1 {
-      margin: 0 0 18px;
-      font-size: 38px;
-      line-height: 1.1;
-    }
+  h1 {
+    font-size: 38px;
+    line-height: 1.1;
+    margin: 0 0 18px;
+  }
 
-    p {
-      color: #ccc;
-      line-height: 1.5;
-    }
+  p {
+    color: #ccc;
+    line-height: 1.5;
+  }
 
-    button {
-      padding: 15px 28px;
-      border: none;
-      border-radius: 28px;
-      background: #ffdc51;
-      color: #111;
-      font-size: 16px;
-      font-weight: bold;
-      cursor: pointer;
-    }
+  button {
+    border: 0;
+    border-radius: 28px;
+    background: #ffdc51;
+    color: #111;
+    padding: 15px 28px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+  }
 
-    button:disabled {
-      opacity: 0.5;
-    }
+  button:disabled {
+    opacity: 0.5;
+  }
 
-    #hint {
-      position: fixed;
-      top: max(24px, env(safe-area-inset-top));
-      left: 20px;
-      right: 20px;
-      z-index: 4;
-      text-align: center;
-      pointer-events: none;
-    }
+  #hint {
+    position: fixed;
+    top: max(24px, env(safe-area-inset-top));
+    left: 16px;
+    right: 16px;
+    z-index: 4;
+    text-align: center;
+    pointer-events: none;
+  }
 
-    #hint span {
-      display: inline-block;
-      padding: 10px 16px;
-      border-radius: 22px;
-      background: rgba(0, 0, 0, 0.65);
-      font-size: 14px;
-    }
+  #hint span {
+    display: inline-block;
+    background: #111c;
+    border-radius: 20px;
+    padding: 10px 16px;
+    font-size: 14px;
+  }
 
-    #popup {
-      position: fixed;
-      left: 20px;
-      right: 20px;
-      bottom: max(48px, env(safe-area-inset-bottom));
-      z-index: 5;
-      text-align: center;
-      pointer-events: none;
-      opacity: 0;
-      transform: translateY(12px);
-      transition:
-        opacity 0.7s ease,
-        transform 0.7s ease;
-    }
+  #popup {
+    position: fixed;
+    left: 20px;
+    right: 20px;
+    bottom: max(44px, env(safe-area-inset-bottom));
+    z-index: 5;
+    text-align: center;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(12px);
 
-    #popup.visible {
-      opacity: 1;
-      transform: translateY(0);
-    }
+    transition:
+      opacity 0.7s,
+      transform 0.7s;
+  }
 
-    #popup .card {
-      display: inline-block;
-      padding: 18px 24px;
-      border: 1px solid rgba(255, 220, 81, 0.4);
-      border-radius: 18px;
-      background: rgba(12, 12, 12, 0.85);
-    }
+  #popup.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
 
-    #popup strong {
-      display: block;
-      color: #ffdc51;
-      font-size: 24px;
-    }
+  #popup .card {
+    display: inline-block;
+    border: 1px solid #ffdc5166;
+    border-radius: 18px;
+    background: #111d;
+    padding: 18px 24px;
+  }
 
-    #popup small {
-      display: block;
-      margin-top: 8px;
-      color: #eee;
-      font-size: 13px;
-      letter-spacing: 1px;
-    }
+  #popup strong {
+    display: block;
+    color: #ffdc51;
+    font-size: 24px;
+  }
 
-    #error {
-      max-width: 340px;
-      color: #ffd2a8;
-      font-size: 14px;
-    }
+  #popup small {
+    display: block;
+    margin-top: 8px;
+    font-size: 12px;
+    letter-spacing: 1px;
+  }
 
-    [hidden] {
-      display: none !important;
-    }
-  </style>
+  #error {
+    color: #ffd2a8;
+    max-width: 340px;
+  }
+
+  [hidden] {
+    display: none !important;
+  }
+</style>
 </head>
 
 <body>
 
-  <video
-    id="camera"
-    autoplay
-    muted
-    playsinline
-    webkit-playsinline
-  ></video>
+<video
+  id="camera"
+  autoplay
+  muted
+  playsinline
+  webkit-playsinline
+></video>
 
-  <canvas id="effect"></canvas>
+<canvas id="effect"></canvas>
 
-  <div id="welcome">
-    <div>
-      <h1>There’s more<br>to this box.</h1>
+<div id="welcome">
+  <div>
+    <h1>There’s more<br>to this box.</h1>
 
-      <p>Point your camera at the black box.</p>
+    <p>Point your camera at the black box.</p>
 
-      <button id="start">Start camera</button>
+    <button id="start">Start camera</button>
 
-      <p id="error" role="alert"></p>
-    </div>
+    <p id="error" role="alert"></p>
   </div>
+</div>
 
-  <div id="hint" hidden>
-    <span id="hint-text">Point at the black box.</span>
+<div id="hint" hidden>
+  <span id="status" role="status">
+    Looking for the black box…
+  </span>
+</div>
+
+<div id="popup">
+  <div class="card">
+    <strong>Something’s taking shape.</strong>
+    <small>CHOOSE WHAT’S NEXT</small>
   </div>
+</div>
 
-  <div id="popup">
-    <div class="card">
-      <strong>Something’s taking shape.</strong>
-      <small>CHOOSE WHAT’S NEXT</small>
-    </div>
-  </div>
+<script>
+"use strict";
 
-  <script>
+const CONFIG = {
+  physicalFeet: 9,
+  virtualFeet: 3,
+  riseMs: 2200,
+  pulseMs: 3200
+};
 
-    const CONFIG = {
-      physicalBoxFeet: 9,
-      virtualBoxFeet: 3,
+const $ = id => document.getElementById(id);
 
-      detectionInterval: 150,
-      stableFrames: 5,
+const video = $("camera");
+const canvas = $("effect");
+const ctx = canvas.getContext("2d");
 
-      riseDuration: 2200,
-      pulseDuration: 3200,
+const scan = document.createElement("canvas");
 
-      hideAfter: 650,
-      resetAfter: 2800
-    };
+const scanCtx = scan.getContext("2d", {
+  willReadFrequently: true
+});
 
-    const video = document.getElementById("camera");
-    const canvas = document.getElementById("effect");
-    const ctx = canvas.getContext("2d");
+let W = innerWidth;
+let H = innerHeight;
 
-    const startButton = document.getElementById("start");
-    const welcome = document.getElementById("welcome");
-    const hint = document.getElementById("hint");
-    const hintText = document.getElementById("hint-text");
-    const popup = document.getElementById("popup");
-    const errorText = document.getElementById("error");
+let stream = null;
+let active = false;
 
-    const scanCanvas = document.createElement("canvas");
+let target = null;
+let candidate = null;
 
-    const scanContext = scanCanvas.getContext("2d", {
-      willReadFrequently: true
-    });
+let confidenceMs = 0;
+let candidateSeen = 0;
 
-    scanCanvas.width = 160;
-    scanCanvas.height = 120;
+let triggered = false;
+let startedAt = 0;
+let lastSeen = 0;
+let lastScan = 0;
 
-    let stream = null;
-    let active = false;
+let detectionFailed = false;
 
-    let screenWidth = window.innerWidth;
-    let screenHeight = window.innerHeight;
+const status = text => {
+  if ($("status").textContent !== text) {
+    $("status").textContent = text;
+  }
+};
 
-    let lastDetection = 0;
-    let lastSeen = 0;
+function reset() {
+  target = null;
+  candidate = null;
 
-    let candidate = null;
-    let target = null;
-    let stableCount = 0;
+  confidenceMs = 0;
+  candidateSeen = 0;
 
-    let triggered = false;
-    let riseStarted = 0;
+  triggered = false;
+  startedAt = 0;
+  lastSeen = 0;
+  lastScan = 0;
 
-    function resize() {
-      screenWidth = window.innerWidth;
-      screenHeight = window.innerHeight;
+  detectionFailed = false;
 
-      const dpr = Math.min(
-        window.devicePixelRatio || 1,
-        2
-      );
+  $("popup").classList.remove("visible");
 
-      canvas.width = Math.round(screenWidth * dpr);
-      canvas.height = Math.round(screenHeight * dpr);
+  status("Looking for the black box…");
+}
 
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    }
+function resize() {
+  W = innerWidth;
+  H = innerHeight;
 
-    function resetDetection() {
-      candidate = null;
-      target = null;
-      stableCount = 0;
-      triggered = false;
-      riseStarted = 0;
+  const dpr = Math.min(
+    devicePixelRatio || 1,
+    2
+  );
 
-      popup.classList.remove("visible");
-      hintText.textContent = "Point at the black box.";
-    }
+  canvas.width = Math.round(W * dpr);
+  canvas.height = Math.round(H * dpr);
 
-    function overlap(a, b) {
-      if (!a || !b) {
-        return 0;
-      }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-      const left = Math.max(a.x, b.x);
-      const top = Math.max(a.y, b.y);
+  scan.width = 160;
 
-      const right = Math.min(
-        a.x + a.w,
-        b.x + b.w
-      );
+  scan.height = Math.max(
+    64,
+    Math.round(160 * H / W)
+  );
 
-      const bottom = Math.min(
-        a.y + a.h,
-        b.y + b.h
-      );
+}
 
-      const intersection =
-        Math.max(0, right - left) *
-        Math.max(0, bottom - top);
+function overlap(a, b) {
+  if (!a || !b) {
+    return 0;
+  }
 
-      const union =
-        a.w * a.h +
-        b.w * b.h -
-        intersection;
-
-      return union > 0 ? intersection / union : 0;
-    }
-
-    function detectDarkBox(image) {
-      const {
-        data,
-        width: w,
-        height: h
-      } = image;
-
-      const count = w * h;
-
-      const mask = new Uint8Array(count);
-      const seen = new Uint8Array(count);
-      const queue = new Int32Array(count);
-
-      for (let i = 0; i < count; i++) {
-        const p = i * 4;
-
-        const luminance =
-          0.2126 * data[p] +
-          0.7152 * data[p + 1] +
-          0.0722 * data[p + 2];
-
-        mask[i] = luminance < 65 ? 1 : 0;
-      }
-
-      let best = null;
-      let bestScore = 0;
-
-      for (let start = 0; start < count; start++) {
-        if (!mask[start] || seen[start]) {
-          continue;
-        }
-
-        let head = 0;
-        let tail = 0;
-        let pixels = 0;
-
-        let minX = w;
-        let minY = h;
-        let maxX = 0;
-        let maxY = 0;
-
-        let darknessSum = 0;
-
-        queue[tail++] = start;
-        seen[start] = 1;
-
-        while (head < tail) {
-          const index = queue[head++];
-
-          const x = index % w;
-          const y = Math.floor(index / w);
-
-          pixels++;
-
-          minX = Math.min(minX, x);
-          minY = Math.min(minY, y);
-          maxX = Math.max(maxX, x);
-          maxY = Math.max(maxY, y);
-
-          darknessSum += (
-            data[index * 4] +
-            data[index * 4 + 1] +
-            data[index * 4 + 2]
-          ) / 3;
-
-          const neighbors = [
-            x > 0 ? index - 1 : -1,
-            x < w - 1 ? index + 1 : -1,
-            y > 0 ? index - w : -1,
-            y < h - 1 ? index + w : -1
-          ];
-
-          for (const next of neighbors) {
-            if (
-              next >= 0 &&
-              mask[next] &&
-              !seen[next]
-            ) {
-              seen[next] = 1;
-              queue[tail++] = next;
-            }
-          }
-        }
-
-        const boxWidth = maxX - minX + 1;
-        const boxHeight = maxY - minY + 1;
-
-        const area = boxWidth * boxHeight;
-        const ratio = boxWidth / boxHeight;
-        const fill = pixels / area;
-
-        if (
-          pixels < count * 0.025 ||
-          area > count * 0.7 ||
-          boxWidth < 18 ||
-          boxHeight < 18 ||
-          ratio < 0.5 ||
-          ratio > 1.85 ||
-          fill < 0.65
-        ) {
-          continue;
-        }
-
-        if (
-          minX < 2 ||
-          minY < 2 ||
-          maxX > w - 3 ||
-          maxY > h - 3
-        ) {
-          continue;
-        }
-
-        let surroundingSum = 0;
-        let samples = 0;
-
-        for (
-          let y = Math.max(0, minY - 4);
-          y <= Math.min(h - 1, maxY + 4);
-          y++
-        ) {
-          for (
-            let x = Math.max(0, minX - 4);
-            x <= Math.min(w - 1, maxX + 4);
-            x++
-          ) {
-            if (
-              x >= minX &&
-              x <= maxX &&
-              y >= minY &&
-              y <= maxY
-            ) {
-              continue;
-            }
-
-            const p = (y * w + x) * 4;
-
-            surroundingSum += (
-              data[p] +
-              data[p + 1] +
-              data[p + 2]
-            ) / 3;
-
-            samples++;
-          }
-        }
-
-        const contrast =
-          samples > 0
-            ? surroundingSum / samples -
-              darknessSum / pixels
-            : 0;
-
-        if (contrast < 18) {
-          continue;
-        }
-
-        const score = pixels * fill;
-
-        if (score > bestScore) {
-          bestScore = score;
-
-          best = {
-            x: minX,
-            y: minY,
-            w: boxWidth,
-            h: boxHeight
-          };
-        }
-      }
-
-      return best;
-    }
-
-    function updateDetection(now) {
-      if (
-        !active ||
-        video.readyState < 2 ||
-        video.paused
-      ) {
-        return;
-      }
-
-      const scanHeight = Math.max(
-        60,
-        Math.round(
-          scanCanvas.width *
-          video.videoHeight /
-          video.videoWidth
-        )
-      );
-
-      if (scanCanvas.height !== scanHeight) {
-        scanCanvas.height = scanHeight;
-      }
-
-      scanContext.drawImage(
-        video,
-        0,
-        0,
-        scanCanvas.width,
-        scanCanvas.height
-      );
-
-      const image = scanContext.getImageData(
-        0,
-        0,
-        scanCanvas.width,
-        scanCanvas.height
-      );
-
-      const detected = detectDarkBox(image);
-
-      if (!detected) {
-        candidate = null;
-        stableCount = 0;
-        return;
-      }
-
-      const normalized = {
-        x: detected.x / image.width,
-        y: detected.y / image.height,
-        w: detected.w / image.width,
-        h: detected.h / image.height
-      };
-
-      if (triggered) {
-        if (overlap(target, normalized) < 0.2) {
-          return;
-        }
-
-        for (const key of ["x", "y", "w", "h"]) {
-          target[key] += (
-            normalized[key] - target[key]
-          ) * 0.25;
-        }
-
-        lastSeen = now;
-        return;
-      }
-
-      stableCount =
-        overlap(candidate, normalized) > 0.45
-          ? stableCount + 1
-          : 1;
-
-      candidate = normalized;
-
-      hintText.textContent = "Hold for a moment…";
-
-      if (stableCount >= CONFIG.stableFrames) {
-        target = { ...normalized };
-
-        triggered = true;
-        riseStarted = now;
-        lastSeen = now;
-
-        hintText.textContent = "Something is stirring…";
-      }
-    }
-
-    function screenBox(box) {
-      const scale = Math.max(
-        screenWidth / video.videoWidth,
-        screenHeight / video.videoHeight
-      );
-
-      const displayedWidth =
-        video.videoWidth * scale;
-
-      const displayedHeight =
-        video.videoHeight * scale;
-
-      return {
-        x:
-          box.x * displayedWidth +
-          (screenWidth - displayedWidth) / 2,
-
-        y:
-          box.y * displayedHeight +
-          (screenHeight - displayedHeight) / 2,
-
-        w: box.w * displayedWidth,
-        h: box.h * displayedHeight
-      };
-    }
-
-    function polygon(points) {
-      ctx.beginPath();
-
-      points.forEach((point, index) => {
-        if (index === 0) {
-          ctx.moveTo(point[0], point[1]);
-        } else {
-          ctx.lineTo(point[0], point[1]);
-        }
-      });
-
-      ctx.closePath();
-    }
-
-    function drawBox(now) {
-      const detected = screenBox(target);
-
-      const sizeRatio =
-        CONFIG.virtualBoxFeet /
-        CONFIG.physicalBoxFeet;
-
-      const width = detected.w * sizeRatio;
-      const height = width;
-
-      const ground =
-        detected.y + detected.h;
-
-      const progress = Math.min(
-        (now - riseStarted) /
-        CONFIG.riseDuration,
-        1
-      );
-
-      const eased =
-        1 - Math.pow(1 - progress, 3);
-
-      const riseOffset =
-        height * 1.2 * (1 - eased);
-
-      const x =
-        detected.x +
-        detected.w / 2 -
-        width / 2;
-
-      const y =
-        ground - height + riseOffset;
-
-      const depthX = width * 0.18;
-      const depthY = height * 0.17;
-
-      const frontWidth = width - depthX;
-      const frontHeight = height - depthY;
-
-      const A = [x, y + depthY];
-      const B = [x + frontWidth, y + depthY];
-      const C = [
-        x + frontWidth,
-        y + depthY + frontHeight
-      ];
-
-      const D = [
-        x,
-        y + depthY + frontHeight
-      ];
-
-      const E = [x + depthX, y];
-      const F = [x + width, y];
-
-      const G = [
-        x + width,
-        y + frontHeight
-      ];
-
-      const pulse =
-        0.5 +
-        0.5 * Math.sin(
-          (now - riseStarted) *
-          Math.PI * 2 /
-          CONFIG.pulseDuration
-        );
-
-      ctx.save();
-
-      ctx.beginPath();
-      ctx.rect(
-        0,
-        0,
-        screenWidth,
-        Math.max(0, ground + 3)
-      );
-
-      ctx.clip();
-
-      // Simple dark cube faces.
-      ctx.fillStyle = "rgba(10, 11, 12, 0.88)";
-      polygon([A, B, C, D]);
-      ctx.fill();
-
-      ctx.fillStyle = "rgba(27, 28, 28, 0.88)";
-      polygon([A, E, F, B]);
-      ctx.fill();
-
-      ctx.fillStyle = "rgba(5, 6, 7, 0.9)";
-      polygon([B, F, G, C]);
-      ctx.fill();
-
-      const edges = [
-        [A, B],
-        [B, C],
-        [C, D],
-        [D, A],
-        [A, E],
-        [E, F],
-        [F, B],
-        [F, G],
-        [G, C]
-      ];
-
-      // Draw the soft glow, then a thin bright core.
-      for (let pass = 0; pass < 2; pass++) {
-        ctx.beginPath();
-
-        for (const [from, to] of edges) {
-          ctx.moveTo(from[0], from[1]);
-          ctx.lineTo(to[0], to[1]);
-        }
-
-        ctx.lineJoin = "round";
-        ctx.lineCap = "round";
-
-        ctx.strokeStyle =
-          pass === 0
-            ? `rgba(255, 210, 30, ${0.35 + pulse * 0.35})`
-            : `rgba(255, 235, 120, ${0.65 + pulse * 0.35})`;
-
-        ctx.lineWidth = pass === 0 ? 5 : 1.6;
-
-        ctx.shadowColor = "#ffd629";
-        ctx.shadowBlur =
-          pass === 0 ? 12 + pulse * 12 : 3;
-
-        ctx.stroke();
-      }
-
-      ctx.restore();
-
-      if (progress >= 1) {
-        popup.classList.add("visible");
-        hintText.textContent = "There’s more to come.";
-      }
-    }
-
-    function animate(now) {
-      requestAnimationFrame(animate);
-
-      ctx.clearRect(
-        0,
-        0,
-        screenWidth,
-        screenHeight
-      );
-
-      if (
-        !active ||
-        document.hidden ||
-        video.paused
-      ) {
-        popup.classList.remove("visible");
-        return;
-      }
-
-      if (
-        now - lastDetection >=
-        CONFIG.detectionInterval
-      ) {
-        lastDetection = now;
-        updateDetection(now);
-      }
-
-      if (!triggered) {
-        if (!candidate) {
-          hintText.textContent =
-            "Point at the black box.";
-        }
-
-        return;
-      }
-
-      const timeMissing = now - lastSeen;
-
-      if (timeMissing > CONFIG.resetAfter) {
-        resetDetection();
-        return;
-      }
-
-      if (timeMissing > CONFIG.hideAfter) {
-        popup.classList.remove("visible");
-
-        hintText.textContent =
-          "Point back at the black box.";
-
-        return;
-      }
-
-      drawBox(now);
-    }
-
-    startButton.onclick = async () => {
-      startButton.disabled = true;
-      errorText.textContent = "";
-
-      try {
-        if (
-          !window.isSecureContext ||
-          !navigator.mediaDevices?.getUserMedia
-        ) {
-          throw new Error("HTTPS_REQUIRED");
-        }
-
-        const hasLiveCamera = stream
-          ?.getVideoTracks()
-          .some(track => track.readyState === "live");
-
-        if (!hasLiveCamera) {
-          stream =
-            await navigator.mediaDevices.getUserMedia({
-              audio: false,
-
-              video: {
-                facingMode: {
-                  ideal: "environment"
-                },
-
-                width: {
-                  ideal: 1280
-                },
-
-                height: {
-                  ideal: 720
-                }
-              }
-            });
-
-          video.srcObject = stream;
-        }
-
-        video.muted = true;
-
-        await video.play();
-
-        active = true;
-        welcome.hidden = true;
-        hint.hidden = false;
-
-        resetDetection();
-        resize();
-      } catch (error) {
-        startButton.disabled = false;
-        startButton.textContent = "Try again";
-
-        if (error.message === "HTTPS_REQUIRED") {
-          errorText.textContent =
-            "Open the HTTPS GitHub Pages link in Safari or Chrome.";
-        } else if (
-          error.name === "NotAllowedError"
-        ) {
-          errorText.textContent =
-            "Allow camera access, then tap Try again.";
-        } else {
-          errorText.textContent =
-            "Camera unavailable. Open this page directly in Safari or Chrome.";
-        }
-
-        console.error(error);
-      }
-    };
-
-    window.addEventListener("resize", () => {
-      resize();
-      resetDetection();
-    });
-
-    document.addEventListener(
-      "visibilitychange",
-      () => {
-        if (!document.hidden) {
-          resetDetection();
-        }
-      }
+  const intersection =
+    Math.max(
+      0,
+      Math.min(a.x + a.w, b.x + b.w) -
+      Math.max(a.x, b.x)
+    ) *
+    Math.max(
+      0,
+      Math.min(a.y + a.h, b.y + b.h) -
+      Math.max(a.y, b.y)
     );
 
-    window.addEventListener("pagehide", () => {
-      stream?.getTracks().forEach(track => {
-        track.stop();
+  const union =
+    a.w * a.h +
+    b.w * b.h -
+    intersection;
+
+  return intersection / (union || 1);
+}
+
+function detectBox(image) {
+  const {
+    width: w,
+    height: h,
+    data
+  } = image;
+
+  const N = w * h;
+
+  const gray = new Uint8Array(N);
+  const queue = new Int32Array(N);
+
+  for (let i = 0; i < N; i++) {
+    gray[i] = Math.round(
+      0.2126 * data[i * 4] +
+      0.7152 * data[i * 4 + 1] +
+      0.0722 * data[i * 4 + 2]
+    );
+  }
+
+  let best = null;
+  let bestScore = 0;
+
+  for (const threshold of [45, 75, 105]) {
+    const seen = new Uint8Array(N);
+
+    for (let seed = 0; seed < N; seed++) {
+      if (
+        seen[seed] ||
+        gray[seed] > threshold
+      ) {
+        continue;
+      }
+
+      let head = 0;
+      let tail = 0;
+      let n = 0;
+      let sum = 0;
+
+      let x0 = w;
+      let y0 = h;
+      let x1 = 0;
+      let y1 = 0;
+
+      queue[tail++] = seed;
+      seen[seed] = 1;
+
+      while (head < tail) {
+        const p = queue[head++];
+
+        const x = p % w;
+        const y = Math.floor(p / w);
+
+        n++;
+        sum += gray[p];
+
+        x0 = Math.min(x0, x);
+        x1 = Math.max(x1, x);
+
+        y0 = Math.min(y0, y);
+        y1 = Math.max(y1, y);
+
+        const neighbors = [
+          x > 0 ? p - 1 : -1,
+          x < w - 1 ? p + 1 : -1,
+          y > 0 ? p - w : -1,
+          y < h - 1 ? p + w : -1
+        ];
+
+        for (const q of neighbors) {
+          if (
+            q >= 0 &&
+            !seen[q] &&
+            gray[q] <= threshold
+          ) {
+            seen[q] = 1;
+            queue[tail++] = q;
+          }
+        }
+      }
+
+      const bw = x1 - x0 + 1;
+      const bh = y1 - y0 + 1;
+
+      const area = bw * bh;
+      const fill = n / area;
+      const ratio = bw / bh;
+
+      if (
+        area < N * 0.012 ||
+        area > N * 0.8 ||
+        bw < w * 0.1 ||
+        bh < h * 0.08 ||
+        ratio < 0.4 ||
+        ratio > 2.3 ||
+        fill < 0.5
+      ) {
+        continue;
+      }
+
+      const borders =
+        Number(x0 === 0) +
+        Number(x1 === w - 1) +
+        Number(y0 === 0) +
+        Number(y1 === h - 1);
+
+      if (borders > 1) {
+        continue;
+      }
+
+      let ring = 0;
+      let samples = 0;
+
+      for (
+        let y = Math.max(0, y0 - 3);
+        y <= Math.min(h - 1, y1 + 3);
+        y++
+      ) {
+        for (
+          let x = Math.max(0, x0 - 3);
+          x <= Math.min(w - 1, x1 + 3);
+          x++
+        ) {
+          if (
+            x >= x0 &&
+            x <= x1 &&
+            y >= y0 &&
+            y <= y1
+          ) {
+            continue;
+          }
+
+          ring += gray[y * w + x];
+          samples++;
+        }
+      }
+
+      const contrast = samples
+        ? ring / samples - sum / n
+        : 0;
+
+      if (
+        contrast < 12 ||
+        sum / n > 95
+      ) {
+        continue;
+      }
+
+      const score =
+        n *
+        fill *
+        (
+          0.7 +
+          Math.min(contrast, 80) / 80
+        );
+
+      if (score > bestScore) {
+        bestScore = score;
+
+        best = {
+          x: x0 / w,
+          y: y0 / h,
+          w: bw / w,
+          h: bh / h
+        };
+      }
+    }
+  }
+
+  return best;
+}
+
+function inspect(now) {
+  if (
+    !video.videoWidth ||
+    !video.videoHeight ||
+    video.readyState < 2
+  ) {
+    return;
+  }
+
+  const scale = Math.max(
+    W / video.videoWidth,
+    H / video.videoHeight
+  );
+
+  const sourceW = W / scale;
+  const sourceH = H / scale;
+
+  scanCtx.drawImage(
+    video,
+
+    (video.videoWidth - sourceW) / 2,
+    (video.videoHeight - sourceH) / 2,
+
+    sourceW,
+    sourceH,
+
+    0,
+    0,
+
+    scan.width,
+    scan.height
+  );
+
+  const found = detectBox(
+    scanCtx.getImageData(
+      0,
+      0,
+      scan.width,
+      scan.height
+    )
+  );
+
+  if (!found) {
+    if (
+      !triggered &&
+      now - candidateSeen > 650
+    ) {
+      candidate = null;
+      confidenceMs = 0;
+
+      status("Looking for the black box…");
+    }
+
+    return;
+  }
+
+  if (triggered) {
+    if (overlap(target, found) > 0.15) {
+      for (const key of ["x", "y", "w", "h"]) {
+        target[key] += (
+          found[key] - target[key]
+        ) * 0.3;
+      }
+
+      lastSeen = now;
+    }
+
+    return;
+  }
+
+  if (
+    overlap(candidate, found) > 0.25 &&
+    now - candidateSeen < 650
+  ) {
+    confidenceMs += Math.min(
+      now - candidateSeen,
+      200
+    );
+  } else {
+    confidenceMs = 0;
+  }
+
+  candidate = found;
+  candidateSeen = now;
+
+  status("Box-shaped object found…");
+
+  if (confidenceMs >= 450) {
+    target = { ...found };
+
+    triggered = true;
+    startedAt = now;
+    lastSeen = now;
+
+    status("Something is stirring…");
+  }
+}
+
+function path(points) {
+  ctx.beginPath();
+
+  points.forEach(([x, y], index) => {
+    if (index === 0) {
+      ctx.moveTo(x, y);
+    } else {
+      ctx.lineTo(x, y);
+    }
+  });
+
+  ctx.closePath();
+}
+
+function draw(now) {
+  const box = {
+    x: target.x * W,
+    y: target.y * H,
+    w: target.w * W,
+    h: target.h * H
+  };
+
+  const size =
+    box.w *
+    CONFIG.virtualFeet /
+    CONFIG.physicalFeet;
+
+  const ground = Math.min(
+    H - 8,
+    box.y + box.h
+  );
+
+  const progress = Math.min(
+    1,
+    (now - startedAt) / CONFIG.riseMs
+  );
+
+  const ease =
+    1 - Math.pow(1 - progress, 3);
+
+  const x =
+    box.x + box.w / 2 - size / 2;
+
+  const y =
+    ground -
+    size +
+    size * 1.1 * (1 - ease);
+
+  const dx = size * 0.18;
+  const dy = size * 0.17;
+
+  const A = [x, y + dy];
+
+  const B = [
+    x + size - dx,
+    y + dy
+  ];
+
+  const C = [
+    x + size - dx,
+    y + size
+  ];
+
+  const D = [x, y + size];
+
+  const E = [x + dx, y];
+  const F = [x + size, y];
+
+  const G = [
+    x + size,
+    y + size - dy
+  ];
+
+  const pulse =
+    0.5 +
+    0.5 * Math.sin(
+      (now - startedAt) *
+      Math.PI * 2 /
+      CONFIG.pulseMs
+    );
+
+  ctx.save();
+
+  ctx.beginPath();
+
+  ctx.rect(
+    0,
+    0,
+    W,
+    Math.max(0, ground + 3)
+  );
+
+  ctx.clip();
+
+  ctx.fillStyle = "rgba(8,9,10,.68)";
+  path([A, B, C, D]);
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(28,29,30,.65)";
+  path([A, E, F, B]);
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(5,6,7,.72)";
+  path([B, F, G, C]);
+  ctx.fill();
+
+  const edges = [
+    [A, B],
+    [B, C],
+    [C, D],
+    [D, A],
+    [A, E],
+    [E, F],
+    [F, B],
+    [F, G],
+    [G, C]
+  ];
+
+  for (let pass = 0; pass < 2; pass++) {
+    ctx.beginPath();
+
+    for (const [from, to] of edges) {
+      ctx.moveTo(...from);
+      ctx.lineTo(...to);
+    }
+
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+
+    ctx.strokeStyle =
+      `rgba(
+        255,
+        ${pass ? 235 : 210},
+        ${pass ? 120 : 30},
+        ${0.55 + pulse * 0.4}
+      )`;
+
+    ctx.lineWidth = pass ? 1.7 : 4;
+
+    ctx.shadowColor = "#ffdb32";
+
+    ctx.shadowBlur =
+      pass ? 3 : 12 + pulse * 10;
+
+    ctx.stroke();
+  }
+
+  ctx.restore();
+
+  if (progress >= 1) {
+    $("popup").classList.add("visible");
+
+    status("There’s more to come.");
+  }
+}
+
+function animate(now) {
+  requestAnimationFrame(animate);
+
+  ctx.clearRect(0, 0, W, H);
+
+  if (
+    !active ||
+    document.hidden ||
+    video.paused
+  ) {
+    return;
+  }
+
+  if (
+    !detectionFailed &&
+    now - lastScan >= 180
+  ) {
+    lastScan = now;
+
+    try {
+      inspect(now);
+    } catch (error) {
+      detectionFailed = true;
+
+      status(
+        "Detection stopped. Reload this page."
+      );
+
+      console.error(error);
+    }
+  }
+
+  if (detectionFailed) {
+    return;
+  }
+
+  if (triggered) {
+    const missing = now - lastSeen;
+
+    if (missing > 4000) {
+      reset();
+      return;
+    }
+
+    if (missing > 1500) {
+      $("popup").classList.remove("visible");
+
+      status(
+        "Point back at the black box."
+      );
+
+      return;
+    }
+
+    draw(now);
+  } else if (
+    candidate &&
+    now - candidateSeen < 650
+  ) {
+    ctx.strokeStyle =
+      "rgba(255,220,81,.55)";
+
+    ctx.lineWidth = 1.5;
+
+    ctx.strokeRect(
+      candidate.x * W,
+      candidate.y * H,
+      candidate.w * W,
+      candidate.h * H
+    );
+  }
+}
+
+$("start").onclick = async () => {
+  $("start").disabled = true;
+  $("error").textContent = "";
+
+  try {
+    if (
+      !isSecureContext ||
+      !navigator.mediaDevices?.getUserMedia
+    ) {
+      throw new Error("HTTPS_REQUIRED");
+    }
+
+    const hasLiveCamera = stream
+      ?.getVideoTracks()
+      .some(track => {
+        return track.readyState === "live";
       });
 
-      stream = null;
-      active = false;
+    if (!hasLiveCamera) {
+      stream =
+        await navigator.mediaDevices.getUserMedia({
+          audio: false,
 
-      resetDetection();
+          video: {
+            facingMode: {
+              ideal: "environment"
+            },
 
-      welcome.hidden = false;
-      hint.hidden = true;
+            width: {
+              ideal: 1280
+            },
 
-      startButton.disabled = false;
-      startButton.textContent = "Start camera";
-    });
+            height: {
+              ideal: 720
+            }
+          }
+        });
 
+      video.srcObject = stream;
+    }
+
+    video.muted = true;
+
+    await video.play();
+
+    active = true;
+
+    reset();
     resize();
-    requestAnimationFrame(animate);
-  </script>
+
+    $("welcome").hidden = true;
+    $("hint").hidden = false;
+  } catch (error) {
+    $("start").disabled = false;
+    $("start").textContent = "Try again";
+
+    $("error").textContent =
+      error.message === "HTTPS_REQUIRED"
+        ? "Open your HTTPS GitHub Pages link."
+        : error.name === "NotAllowedError"
+          ? "Allow camera access, then try again."
+          : "Could not start camera. Open this page directly in Safari or Chrome.";
+
+    console.error(error);
+  }
+};
+
+addEventListener("resize", resize);
+
+addEventListener("pagehide", () => {
+  stream?.getTracks().forEach(track => {
+    track.stop();
+  });
+
+  stream = null;
+  active = false;
+
+  reset();
+
+  $("welcome").hidden = false;
+  $("hint").hidden = true;
+  $("start").disabled = false;
+});
+
+document.addEventListener(
+  "visibilitychange",
+  () => {
+    if (!document.hidden) {
+      reset();
+    }
+  }
+);
+
+resize();
+requestAnimationFrame(animate);
+</script>
 
 </body>
 </html>
