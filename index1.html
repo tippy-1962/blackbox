@@ -189,23 +189,6 @@
   </div>
 
   <script>
-    /*
-      No Hiro marker.
-      No Drop button.
-      No external libraries.
-
-      Prototype trigger:
-      detects a large dark, box-shaped region.
-
-      This is not a trained object-recognition model.
-      Other dark objects may also trigger it.
-
-      The virtual cube is approximately one third
-      of the detected physical box's width:
-      3 feet compared with a 9-foot installation.
-
-      Position and size are visual estimates.
-    */
 
     const CONFIG = {
       physicalBoxFeet: 9,
@@ -313,7 +296,6 @@
       return union > 0 ? intersection / union : 0;
     }
 
-    // Find connected dark regions in the camera image.
     function detectDarkBox(image) {
       const {
         data,
@@ -417,7 +399,6 @@
           continue;
         }
 
-        // Reject regions clipped by the camera frame.
         if (
           minX < 2 ||
           minY < 2 ||
@@ -427,7 +408,6 @@
           continue;
         }
 
-        // Check for contrast around the dark object.
         let surroundingSum = 0;
         let samples = 0;
 
@@ -498,7 +478,6 @@
         return;
       }
 
-      // Match the scan aspect ratio to the video.
       const scanHeight = Math.max(
         60,
         Math.round(
@@ -543,7 +522,6 @@
       };
 
       if (triggered) {
-        // Avoid jumping to another object mid-animation.
         if (overlap(target, normalized) < 0.2) {
           return;
         }
@@ -578,8 +556,6 @@
       }
     }
 
-    // Convert camera coordinates to the cropped
-    // object-fit: cover video shown on screen.
     function screenBox(box) {
       const scale = Math.max(
         screenWidth / video.videoWidth,
@@ -679,7 +655,6 @@
         y + frontHeight
       ];
 
-      // Slow, gentle brightness pulse.
       const pulse =
         0.5 +
         0.5 * Math.sin(
@@ -690,7 +665,6 @@
 
       ctx.save();
 
-      // Hide the part still below the ground line.
       ctx.beginPath();
       ctx.rect(
         0,
